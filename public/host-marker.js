@@ -1,6 +1,6 @@
 (function () {
   var PAYLOAD_ID = "logseq-library-display-payload";
-  var MARKER_VERSION = 8;
+  var MARKER_VERSION = 9;
   var PARENTED_ATTR = "data-library-display-parented";
   var CONTAINS_ATTR = "data-library-display-contains-parented-reference";
   var PARENTED_CLASS = "library-display-parented-reference";
@@ -228,6 +228,7 @@
       var icon = document.createElement("span");
       icon.className = ICON_CLASS;
       icon.textContent = view.renderText || "";
+      if (view.renderPrefix) element.appendChild(document.createTextNode(view.renderPrefix));
       element.appendChild(icon);
       element.appendChild(document.createTextNode(view.renderSuffix || ""));
     } else {
@@ -499,7 +500,7 @@
       var icon = document.createElement("span");
       icon.className = ICON_CLASS;
       icon.textContent = view.renderText || "";
-      span.appendChild(document.createTextNode("[[ "));
+      span.appendChild(document.createTextNode("[[ " + (view.renderPrefix || "")));
       span.appendChild(icon);
       span.appendChild(document.createTextNode((view.renderSuffix || "") + " ]]"));
     } else {

@@ -60,6 +60,7 @@ type PageView = {
   parentId?: number;
   parentUuid?: string;
   renderText: string;
+  renderPrefix?: string;
   renderSuffix?: string;
   renderFontFamily?: string;
 };
@@ -117,7 +118,8 @@ let hostMarkerScriptLoad: Promise<void> | undefined;
 let lastHostMarkerSignature = "";
 const PAGE_SEPARATOR = " / ";
 const HOST_MARKER_KEY = "logseq-library-display-payload";
-const HOST_MARKER_SCRIPT_VERSION = 8;
+const HOST_MARKER_SCRIPT_VERSION = 9;
+const MAX_ANCESTOR_DEPTH = 32;
 const HOST_MARKER_STYLE = `
 .library-display-rendered-reference-icon{font-family:tabler-icons!important;}
 .library-display-rendered-reference{color:inherit;text-decoration:inherit;}
@@ -512,11 +514,43 @@ async function parentForEntity(
   return getPageByRef(parentRef(entity), cache);
 }
 
-function pageView(page: PageEntity, parent: PageEntity): PageView {
-  const parentTitle = pageTitle(parent);
+// Returns the entity's ancestors ordered from the root down to the immediate parent.
+async function ancestorsForEntity(
+  entity: PageEntity,
+  cache: Map<string, Promise<PageEntity | undefined>>,
+): Promise<PageEntity[]> {
+  const ancestors: PageEntity[] = [];
+  const seen = new Set<string>();
+  const ownKey = uniqueEntityKey(entity);
+  if (ownKey) seen.add(ownKey);
+
+  let current = entity;
+  while (ancestors.length < MAX_ANCESTOR_DEPTH) {
+    const parent = await parentForEntity(current, cache);
+    if (!parent) break;
+
+    const key = uniqueEntityKey(parent);
+    if (key && seen.has(key)) break;
+    if (key) seen.add(key);
+
+    ancestors.unshift(parent);
+    current = parent;
+  }
+
+  return ancestors;
+}
+
+function pageView(page: PageEntity, ancestors: PageEntity[]): PageView {
+  const parent = ancestors[ancestors.length - 1];
+  const ancestorTitles = ancestors.map(pageTitle);
+  const parentTitle = ancestorTitles.join(PAGE_SEPARATOR);
   const childTitle = pageTitle(page);
   const text = `${parentTitle}${PAGE_SEPARATOR}${childTitle}`;
   const icon = parentIcon(parent);
+  const pathPrefix = ancestorTitles
+    .slice(0, -1)
+    .map((title) => `${title}${PAGE_SEPARATOR}`)
+    .join("");
   const mode = settings().displayMode;
   const metadata = {
     parentTitle,
@@ -533,6 +567,7 @@ function pageView(page: PageEntity, parent: PageEntity): PageView {
         display: text,
         title: text,
         ...metadata,
+        renderPrefix: pathPrefix,
         renderText: icon.value,
         renderSuffix: `${PAGE_SEPARATOR}${childTitle}`,
         renderFontFamily: "tabler-icons",
@@ -540,10 +575,10 @@ function pageView(page: PageEntity, parent: PageEntity): PageView {
     }
 
     return {
-      display: `${icon.value}${PAGE_SEPARATOR}${childTitle}`,
+      display: `${pathPrefix}${icon.value}${PAGE_SEPARATOR}${childTitle}`,
       title: text,
       ...metadata,
-      renderText: `${icon.value}${PAGE_SEPARATOR}${childTitle}`,
+      renderText: `${pathPrefix}${icon.value}${PAGE_SEPARATOR}${childTitle}`,
     };
   }
 
@@ -711,10 +746,10 @@ async function addViewsFromBlocks(
       const referenced = await getPageByRef(ref, cache);
       if (!referenced) continue;
 
-      const parent = await parentForEntity(referenced, cache);
-      if (!parent) continue;
+      const ancestors = await ancestorsForEntity(referenced, cache);
+      if (ancestors.length === 0) continue;
 
-      addHostMarkerView(views, pageView(referenced, parent));
+      addHostMarkerView(views, pageView(referenced, ancestors));
     }
   }
 }
@@ -791,7 +826,7 @@ function registerSettings(): void {
       key: "displayMode",
       type: "enum",
       title: "Display mode",
-      description: "How to render the parent prefix.",
+      description: "How to render the parent path prefix.",
       default: "Text",
       enumChoices: ["Text", "Icon + Text", "Icon"],
       enumPicker: "select",

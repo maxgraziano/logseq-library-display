@@ -1,6 +1,6 @@
 # Logseq Library Display
 
-Logseq Library Display makes Logseq DB page references easier to scan by showing a referenced page together with its parent page.
+Logseq Library Display makes Logseq DB page references easier to scan by showing a referenced page together with its full parent path.
 
 For a DB entity like `Logseq Library Display` whose `:block/parent` is `Plugin`, normal references that render as:
 
@@ -22,9 +22,9 @@ can be displayed as:
 
 - Reads Logseq DB graph data from the local Logseq plugin API.
 - Detects referenced DB entities through `:block/refs`.
-- Looks up each referenced entity's `:block/parent`.
-- Uses the parent page's `:block/title` as the displayed prefix.
-- Uses the parent page's `:logseq.property/icon` when it is available.
+- Walks each referenced entity's `:block/parent` chain up to the root.
+- Uses the ancestors' `:block/title` values, joined with ` / `, as the displayed prefix (e.g. `Library / Plugin / Logseq Library Display`).
+- Uses the immediate parent page's `:logseq.property/icon` when it is available.
 - Supports `Text`, `Icon + Text`, and `Icon` display modes.
 
 The plugin is intended for Logseq DB graphs. It does not add or edit blocks; it only changes how matching page references are displayed.
@@ -49,7 +49,9 @@ The plugin is intended for Logseq DB graphs. It does not add or edit blocks; it 
 [[🧩 / Logseq Library Display]]
 ```
 
-If the parent page has no icon, icon modes fall back to text.
+For nested pages, the full ancestor path is shown before the child. In `Icon` mode only the immediate parent is replaced by its icon, e.g. `Library / 🧩 / Logseq Library Display`.
+
+If the immediate parent page has no icon, icon modes fall back to text.
 
 ## Installation
 
